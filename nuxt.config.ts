@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   app: {
     head: {
-      title: 'cent-informatics',
+      title: 'cent',
       link: [{ rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }]
     }
   },
