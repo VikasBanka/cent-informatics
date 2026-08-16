@@ -77,7 +77,7 @@ async function submit() {
   try {
     const target = editing.value
     if (target) {
-      await $fetch(`/api/clients/${target.id}`, { method: 'PATCH', body: parsed.data })
+      await $fetch(`/api/clients/${target.id}`, { method: 'PUT', body: parsed.data })
     } else {
       await $fetch(`/api/organizations/${organizationId.value}/clients`, {
         method: 'POST',

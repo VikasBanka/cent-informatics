@@ -1,4 +1,5 @@
 import * as z from 'zod/mini'
+import { timestamps } from './record'
 import { requiredText } from './text'
 
 /**
@@ -40,9 +41,10 @@ export const OrganizationDraftSchema = z.object({
  */
 export const OrganizationEditSchema = z.pick(OrganizationDraftSchema, { name: true })
 
-/** A stored organization. */
+/** A stored organization, as the API returns it. */
 export const OrganizationSchema = z.extend(OrganizationDraftSchema, {
-  id: z.uuid()
+  id: z.uuid(),
+  ...timestamps
 })
 
 /** A stored organization as the list endpoint returns it. */

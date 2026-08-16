@@ -1,4 +1,5 @@
 import * as z from 'zod/mini'
+import { timestamps } from './record'
 import { optionalText, requiredText } from './text'
 
 /**
@@ -61,9 +62,10 @@ export const ClientSchema = z.object({
   country: requiredText('Country', 80)
 })
 
-/** A stored client. */
+/** A stored client, as the API returns it. */
 export const ClientRecordSchema = z.extend(ClientSchema, {
-  id: z.uuid()
+  id: z.uuid(),
+  ...timestamps
 })
 
 /**

@@ -88,7 +88,7 @@ async function submit() {
   try {
     const target = editing.value
     if (target) {
-      await $fetch(`/api/organizations/${target.id}`, { method: 'PATCH', body: parsed.data })
+      await $fetch(`/api/organizations/${target.id}`, { method: 'PUT', body: parsed.data })
       toast.value?.show(`Saved changes to ${parsed.data.name}.`)
     } else {
       await $fetch('/api/organizations', { method: 'POST', body: parsed.data })
@@ -174,10 +174,7 @@ async function onClientSaved(message: string) {
   <div class="flex flex-col gap-6">
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-semibold">Organizations</h1>
-        <p class="text-base-content/60">
-          Every client belongs to an organization. Add one before registering its requesters.
-        </p>
+        <h1 class="text-2xl font-semibold">Organizations</h1>        
       </div>
       <button class="btn btn-primary" @click="openDialog(null)">
         <Plus />

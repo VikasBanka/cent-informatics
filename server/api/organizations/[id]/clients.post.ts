@@ -1,16 +1,10 @@
 import * as z from 'zod/mini'
-import { ClientDraftSchema } from '#shared/schemas/client'
-
-const Params = z.object({ id: z.uuid() })
+import { ClientDraftSchema, ClientRecordSchema } from '#shared/schemas/client'
 
 export default defineEventHandler(async (event) => {
-  const params = await getValidatedRouterParams(event, Params.safeParse)
+  const params = await getValidatedRouterParams(event, IdParams.safeParse)
   if (!params.success) {
     throw createError({ statusCode: 400, statusMessage: 'Invalid organization id' })
-  }
-
-  if (!findOrganizationById(params.data.id)) {
-    throw createError({ statusCode: 404, statusMessage: 'Organization not found' })
   }
 
   const body = await readValidatedBody(event, ClientDraftSchema.safeParse)
@@ -22,7 +16,13 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // The owner comes from the URL, never the body.
+  // The owner comes from the URL, never the body — all the way down: the API's
+  // own draft model has no `organizationId` either.
+  const created = await apiFetch(event, `/organizations/${params.data.id}/clients`, {
+    method: 'POST',
+    body: body.data
+  })
+
   setResponseStatus(event, 201)
-  return createClient(params.data.id, body.data)
+  return readUpstream(ClientRecordSchema, created)
 })

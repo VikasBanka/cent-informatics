@@ -1,10 +1,8 @@
 import * as z from 'zod/mini'
-import { ClientDraftSchema } from '#shared/schemas/client'
-
-const Params = z.object({ id: z.uuid() })
+import { ClientDraftSchema, ClientRecordSchema } from '#shared/schemas/client'
 
 export default defineEventHandler(async (event) => {
-  const params = await getValidatedRouterParams(event, Params.safeParse)
+  const params = await getValidatedRouterParams(event, IdParams.safeParse)
   if (!params.success) {
     throw createError({ statusCode: 400, statusMessage: 'Invalid client id' })
   }
@@ -20,10 +18,8 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const client = updateClient(params.data.id, body.data)
-  if (!client) {
-    throw createError({ statusCode: 404, statusMessage: 'Client not found' })
-  }
-
-  return client
+  return readUpstream(
+    ClientRecordSchema,
+    await apiFetch(event, `/clients/${params.data.id}`, { method: 'PUT', body: body.data })
+  )
 })

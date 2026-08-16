@@ -1,16 +1,14 @@
 import * as z from 'zod/mini'
-import { OrganizationEditSchema } from '#shared/schemas/organization'
-
-const Params = z.object({ id: z.uuid() })
+import { OrganizationEditSchema, OrganizationSchema } from '#shared/schemas/organization'
 
 export default defineEventHandler(async (event) => {
-  const params = await getValidatedRouterParams(event, Params.safeParse)
+  const params = await getValidatedRouterParams(event, IdParams.safeParse)
   if (!params.success) {
     throw createError({ statusCode: 400, statusMessage: 'Invalid organization id' })
   }
 
   // A `slug` in the body is dropped here, not rejected: the schema has no such
-  // key, so the update can only ever touch the editable fields.
+  // key, so the update can only ever carry the editable fields upstream.
   const body = await readValidatedBody(event, OrganizationEditSchema.safeParse)
   if (!body.success) {
     throw createError({
@@ -20,10 +18,11 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const organization = updateOrganization(params.data.id, body.data)
-  if (!organization) {
-    throw createError({ statusCode: 404, statusMessage: 'Organization not found' })
-  }
-
-  return organization
+  return readUpstream(
+    OrganizationSchema,
+    await apiFetch(event, `/organizations/${params.data.id}`, {
+      method: 'PUT',
+      body: body.data
+    })
+  )
 })

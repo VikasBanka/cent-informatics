@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { Building2, ChevronUp, FileText, LayoutDashboard, PanelLeft, TestTubes } from '@lucide/vue'
+import { Building2, ChevronUp, FileText, LayoutDashboard, PanelLeft, TestTubes, ChartColumn } from '@lucide/vue'
 
 const navLinks = [
   { label: 'Dashboard', to: '/', icon: LayoutDashboard },
-  { label: 'Samples', to: '/samples', icon: TestTubes },
+  { label: 'Analysis', to: '/analysis', icon: ChartColumn },
   { label: 'Organizations', to: '/organizations', icon: Building2 },
   { label: 'Reports', to: '/reports', icon: FileText }
 ]
