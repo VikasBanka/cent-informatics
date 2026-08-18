@@ -20,8 +20,12 @@ type Method = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
 interface ApiRequest {
   method?: Method
-  /** Already parsed by the caller's schema — never a raw request body. */
-  body?: Record<string, unknown>
+  /**
+   * Already parsed by the caller's schema — never a raw request body. A
+   * `FormData` carries files the caller has parsed as files; ofetch forwards it
+   * as multipart rather than JSON-encoding it.
+   */
+  body?: Record<string, unknown> | FormData
 }
 
 /** A `HTTPException` body: one message the caller can read. */
@@ -39,8 +43,25 @@ const IssueDetail = z.array(
   })
 )
 
-/** Both flavours of error body the service can send. */
-const UpstreamError = z.object({ detail: z.union([MessageDetail, IssueDetail]) })
+/**
+ * A detail that is a list of complaints rather than one message or one per
+ * field — what the files endpoints send, so a batch reports every file that was
+ * wrong instead of stopping at the first.
+ *
+ * Both spellings normalise to one string apiece: the service names the file in
+ * `fileName` when the complaint is about a file rather than about the batch, and
+ * `name — message` is the same line the analysis page writes for a file its own
+ * parse rejected.
+ */
+const FileMessage = z.pipe(
+  z.object({ fileName: z.nullable(z.string()), message: z.string() }),
+  z.transform((issue) => (issue.fileName ? `${issue.fileName} — ${issue.message}` : issue.message))
+)
+
+const MessageListDetail = z.array(z.union([z.string(), FileMessage]))
+
+/** Only the envelope: which flavour of `detail` it holds is decided below. */
+const UpstreamError = z.object({ detail: z.unknown() })
 
 /**
  * Reshapes the service's issues into the per-field record `fieldErrorsFrom()`
@@ -86,15 +107,20 @@ function translated(error: unknown) {
     })
   }
 
-  const parsed = UpstreamError.safeParse(failure.data)
-  const detail = parsed.success ? parsed.data.detail : null
+  const envelope = UpstreamError.safeParse(failure.data)
+  const detail: unknown = envelope.success ? envelope.data.detail : null
 
-  if (typeof detail === 'string') {
-    return createError({ statusCode: failure.status, statusMessage: detail })
+  // One prose message: the service already wrote the sentence to show.
+  const message = MessageDetail.safeParse(detail)
+  if (message.success) {
+    return createError({ statusCode: failure.status, statusMessage: message.data })
   }
 
-  if (detail) {
-    const fields = fieldErrorsFrom(detail)
+  // Per-field issues. Tried before the message list because an entry carrying
+  // `loc`/`msg` is FastAPI's own shape and belongs on the fields it names.
+  const issues = IssueDetail.safeParse(detail)
+  if (issues.success) {
+    const fields = fieldErrorsFrom(issues.data)
     if (fields) {
       return createError({
         statusCode: 400,
@@ -102,6 +128,18 @@ function translated(error: unknown) {
         data: fields
       })
     }
+  }
+
+  // A list of complaints, each already a line the caller can render. The status
+  // is kept: a 409 over duplicate files is not the same answer as a 422 over
+  // unusable ones, and the page distinguishes them.
+  const messages = MessageListDetail.safeParse(detail)
+  if (messages.success && messages.data.length) {
+    return createError({
+      statusCode: failure.status,
+      statusMessage: 'The informatics API rejected the request',
+      data: { messages: messages.data }
+    })
   }
 
   return createError({
@@ -124,6 +162,30 @@ export async function apiFetch(
 
   try {
     return await $fetch(path, { baseURL: apiBaseUrl, ...request })
+  } catch (error) {
+    throw translated(error)
+  }
+}
+
+/**
+ * Calls the service for a response that is bytes rather than a model — a file
+ * download, which has no schema to validate against and must not be JSON-parsed
+ * on the way through.
+ *
+ * Returns the whole response, not just the body, because the headers are the
+ * point: the service decides the file's `Content-Type` and the name in its
+ * `Content-Disposition`, and the route forwards both.
+ */
+export async function apiFetchBytes(event: H3Event, path: string) {
+  const { apiBaseUrl } = useRuntimeConfig(event)
+
+  try {
+    // The type argument is not inferred from `responseType`, so it is named here
+    // — without it the body lands as `{}` and cannot be read as bytes.
+    return await $fetch.raw<ArrayBuffer>(path, {
+      baseURL: apiBaseUrl,
+      responseType: 'arrayBuffer'
+    })
   } catch (error) {
     throw translated(error)
   }

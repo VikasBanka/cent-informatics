@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Building2, ChevronUp, FileText, LayoutDashboard, PanelLeft, TestTubes, ChartColumn } from '@lucide/vue'
+import { Building2, ChevronUp, FileText, LayoutDashboard, ChevronLeft, ChevronRight, ChartColumn } from '@lucide/vue'
 
 const navLinks = [
   { label: 'Dashboard', to: '/', icon: LayoutDashboard },
@@ -29,7 +29,8 @@ const user = {
           class="btn btn-circle btn-sm drawer-button border-base-300 bg-base-100 shadow-sm"
           aria-label="Toggle sidebar"
         >
-          <PanelLeft :size="16" />
+          <ChevronLeft class="is-drawer-close:hidden" />
+          <ChevronRight class="is-drawer-open:hidden" />
         </label>
       </div>
     </div>

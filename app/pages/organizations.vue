@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import * as z from 'zod/mini'
 import { Pencil, Plus, User } from '@lucide/vue'
+import {
+  createColumnHelper,
+  createSortedRowModel,
+  rowSortingFeature,
+  sortFn_alphanumeric,
+  sortFn_basic,
+  tableFeatures,
+  useTable
+} from '@tanstack/vue-table'
 import { ClientRecordSchema, type ClientRecord } from '#shared/schemas/client'
 import {
   OrganizationDraftSchema,
@@ -30,6 +39,39 @@ const {
     }
     return parsed.data
   }
+})
+
+// --- Table -----------------------------------------------------------------
+
+/**
+ * Built once in setup, never inside the table options: a fresh `features` or
+ * `columns` reference throws away the memoised row models. Only
+ * `rowSortingFeature` is registered — the list is short, so there is nothing to
+ * page or filter yet.
+ */
+const features = tableFeatures({
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: { alphanumeric: sortFn_alphanumeric, basic: sortFn_basic }
+})
+
+const helper = createColumnHelper<typeof features, OrganizationSummary>()
+
+const columns = helper.columns([
+  helper.accessor('name', { header: 'Organization', meta: { tdClass: 'font-medium' } }),
+  helper.accessor('slug', { header: 'Slug', meta: { tdClass: 'font-mono' } }),
+  helper.accessor('clientCount', { header: 'Clients' }),
+  // A display column: no accessor, so it is never sortable. `w-0` shrinks it to
+  // the button, which is what keeps the name column wide.
+  helper.display({ id: 'actions', header: 'Actions', meta: { thClass: 'w-0' } })
+])
+
+const table = useTable({
+  features,
+  columns,
+  // The ref itself, never `.value` — that is what lets `refresh()` reach the table.
+  data: organizations,
+  getRowId: (row: OrganizationSummary) => row.id
 })
 
 // --- Add / edit ------------------------------------------------------------
@@ -184,56 +226,35 @@ async function onClientSaved(message: string) {
 
     <div class="card card-border bg-base-100">
       <div class="card-body">
-        <div class="overflow-x-auto">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Organization</th>
-                <th>Slug</th>
-                <th>Clients</th>
-                <th class="w-0"><span class="sr-only">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody v-if="status === 'pending'">
-              <tr>
-                <td colspan="4" class="text-center">
-                  <span class="loading loading-dots"></span>
-                </td>
-              </tr>
-            </tbody>
-            <tbody v-else-if="!organizations.length">
-              <tr>
-                <td colspan="4" class="text-center text-base-content/60">
-                  No organizations yet. Add the first one to get started.
-                </td>
-              </tr>
-            </tbody>
-            <tbody v-else>
-              <tr v-for="organization in organizations" :key="organization.id">
-                <td class="font-medium">{{ organization.name }}</td>
-                <td>
-                  <span class="font-mono">{{ organization.slug }}</span>
-                </td>
-                <td>
-                  <button class="btn btn-ghost btn-sm" @click="openClients(organization)">
-                    {{ organization.clientCount }}
-                    {{ organization.clientCount === 1 ? 'client' : 'clients' }}
-                  </button>
-                </td>
-                <td>
-                  <button
-                    class="btn btn-ghost btn-sm"
-                    :aria-label="`Edit ${organization.name}`"
-                    @click="openDialog(organization)"
-                  >
-                    <Pencil />
-                    Edit
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <AppDataTable
+          :table="table"
+          :loading="status === 'pending'"
+          empty-message="No organizations yet. Add the first one to get started."
+        >
+          <!-- The actions column is labelled for screen readers only; a visible
+               "Actions" heading would just widen the column. -->
+          <template #header-actions>
+            <span class="sr-only">Actions</span>
+          </template>
+
+          <template #cell-clientCount="{ row }">
+            <button class="btn btn-ghost btn-sm" @click="openClients(row)">
+              {{ row.clientCount }}
+              {{ row.clientCount === 1 ? 'client' : 'clients' }}
+            </button>
+          </template>
+
+          <template #cell-actions="{ row }">
+            <button
+              class="btn btn-ghost btn-sm"
+              :aria-label="`Edit ${row.name}`"
+              @click="openDialog(row)"
+            >
+              <Pencil />
+              Edit
+            </button>
+          </template>
+        </AppDataTable>
       </div>
     </div>
 
