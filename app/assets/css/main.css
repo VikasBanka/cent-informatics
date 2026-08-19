@@ -3,3 +3,11 @@
 @plugin "daisyui" {
   themes: bumblebee --default;
 }
+
+/* Tailwind's container scale stops at `7xl` (80rem), which is the content cap up
+   to `xl`. Wide desktops get one more step so the column can take some of the
+   extra width instead of leaving a void beside it — see the `main` element in
+   app/layouts/default.vue. */
+@theme {
+  --container-8xl: 96rem;
+}

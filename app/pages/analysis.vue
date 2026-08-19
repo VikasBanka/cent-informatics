@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CloudUpload, Download, FileText, Trash2, X } from '@lucide/vue'
+import { ChartScatter, CloudUpload, Download, FileText, Trash2, X } from '@lucide/vue'
 import {
   ANALYSIS_FILE_ACCEPT,
   ANALYSIS_FILE_EXTENSIONS,
@@ -228,6 +228,13 @@ function removeSelected() {
   return removeStored([...selected.value], `Deleted ${count} ${count === 1 ? 'file' : 'files'}.`)
 }
 
+/** The analysis panel is opened by the row, so it holds no list state of its own. */
+const drawer = useTemplateRef<{ open: (record: FileRecord) => void }>('drawer')
+
+function analyze(record: FileRecord) {
+  drawer.value?.open(record)
+}
+
 /** e.g. `1.4 MB`. Bytes below a kilobyte are not worth a decimal. */
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -246,17 +253,20 @@ function formatSize(bytes: number): string {
 <template>
   <div class="flex flex-col gap-6">
     <div>
-      <h1 class="text-2xl font-semibold">Analysis</h1>
-      <p class="text-base-content/60">Upload data files to analyse.</p>
+      <h1 class="text-xl font-semibold sm:text-2xl">Analysis</h1>
+      <p class="text-sm text-base-content/60 sm:text-base">Upload data files to analyse.</p>
     </div>
 
     <!-- The aura wraps the card only once there is something to highlight, and
          needs to stay its single direct child. -->
     <div :class="files.length ? 'aura aura-dual aura-xs' : ''">
       <div class="card card-border w-full bg-base-100">
-        <div class="card-body gap-4">
+        <div class="card-body gap-4 p-4 sm:p-6">
+          <!-- A phone has no pointer to drag with, so the zone is sized for
+               tapping rather than for a drop target: less padding, a smaller
+               glyph, and "browse" first in the label. -->
           <label
-            class="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-box border-2 border-dashed px-6 py-12 text-center transition-colors"
+            class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-box border-2 border-dashed px-4 py-8 text-center transition-colors sm:gap-3 sm:px-6 sm:py-12"
             :class="
               dragging ? 'border-primary bg-primary/5' : 'border-base-300 hover:border-base-content/30'
             "
@@ -265,12 +275,14 @@ function formatSize(bytes: number): string {
             @dragleave.prevent="dragDepth = Math.max(0, dragDepth - 1)"
             @drop.prevent="onDrop"
           >
-            <CloudUpload :size="64" class="shrink-0 text-base-content/40" />
+            <!-- Sized by class, not the `size` prop: the attribute is what a
+                 utility has to beat, and a class can be responsive. -->
+            <CloudUpload class="size-10 shrink-0 text-base-content/40 sm:size-16" />
             <span class="font-medium">
-              Drag and drop files here, or
-              <span class="link link-primary">browse</span>
+              <span class="link link-primary">Browse</span>
+              <span class="hidden sm:inline">, or drag and drop files here</span>
             </span>
-            <span class="text-sm text-base-content/60">
+            <span class="text-xs text-base-content/60 sm:text-sm">
               {{ accepts }} — up to {{ ANALYSIS_FILE_MAX_COUNT }} files, each
               {{ ANALYSIS_FILE_MAX_LABEL }} or smaller
             </span>
@@ -293,39 +305,49 @@ function formatSize(bytes: number): string {
             </ul>
           </div>
 
-          <div class="card-actions items-center justify-end">
-            <p v-if="files.length" class="mr-auto text-sm text-base-content/60">
+          <!-- The tally takes its own line on a phone and the buttons split the
+               width below it; from `sm` the three sit on one row. -->
+          <div
+            class="card-actions flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end"
+          >
+            <p v-if="files.length" class="text-sm text-base-content/60 sm:mr-auto">
               {{ files.length }} of {{ ANALYSIS_FILE_MAX_COUNT }} files ·
               {{ formatSize(totalSize) }}
             </p>
-            <button
-              type="button"
-              class="btn btn-ghost"
-              :disabled="!files.length || uploading"
-              @click="clear"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              class="btn btn-primary"
-              :disabled="!ready || uploading"
-              @click="upload"
-            >
-              <span v-if="uploading" class="loading loading-spinner loading-sm"></span>
-              Upload
-            </button>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class="btn btn-ghost flex-1 sm:flex-none"
+                :disabled="!files.length || uploading"
+                @click="clear"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary flex-1 sm:flex-none"
+                :disabled="!ready || uploading"
+                @click="upload"
+              >
+                <span v-if="uploading" class="loading loading-spinner loading-sm"></span>
+                Upload
+              </button>
+            </div>
           </div>
         </div>
 
         <ul v-if="files.length" class="list border-t border-base-300">
           <li v-for="file in files" :key="identify(file)" class="list-row items-center">
             <FileText :size="20" class="shrink-0 text-base-content/40" />
+            <!-- The name is the only part allowed to consume the leftover width,
+                 so the size and the remove button never get squeezed off. -->
             <span class="min-w-0 truncate font-medium">{{ file.name }}</span>
-            <span class="shrink-0 text-sm text-base-content/60">{{ formatSize(file.size) }}</span>
+            <span class="shrink-0 text-xs text-base-content/60 sm:text-sm">
+              {{ formatSize(file.size) }}
+            </span>
             <button
               type="button"
-              class="btn btn-ghost btn-sm btn-square"
+              class="btn btn-ghost btn-sm btn-square shrink-0"
               :aria-label="`Remove ${file.name}`"
               @click="remove(file)"
             >
@@ -337,11 +359,16 @@ function formatSize(bytes: number): string {
     </div>
 
     <div class="card card-border bg-base-100">
-      <div class="card-body gap-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="card-body gap-4 p-4 sm:p-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 class="card-title">Uploaded files</h2>
 
-          <div v-if="stored.length" class="flex items-center gap-4">
+          <!-- On a phone the checkbox and the delete button take the row to
+               themselves, pushed to opposite ends so the tap targets stay apart. -->
+          <div
+            v-if="stored.length"
+            class="flex items-center justify-between gap-3 sm:justify-end sm:gap-4"
+          >
             <label class="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -377,10 +404,15 @@ function formatSize(bytes: number): string {
       </div>
 
       <ul v-if="stored.length" class="list border-t border-base-300">
+        <!-- Three children, not five: a checkbox, the details, and the actions
+             as one group. `list-row` is a grid and only its second child takes
+             the leftover width, so every extra top-level child is another track
+             competing for a phone's 360px. The status badge therefore sits in
+             the detail line rather than in a track of its own. -->
         <li v-for="record in stored" :key="record.id" class="list-row items-center">
           <input
             type="checkbox"
-            class="checkbox checkbox-sm"
+            class="checkbox checkbox-sm shrink-0"
             :checked="selected.has(record.id)"
             :aria-label="`Select ${record.fileName}`"
             @change="toggle(record.id)"
@@ -388,51 +420,67 @@ function formatSize(bytes: number): string {
 
           <div class="min-w-0">
             <div class="truncate font-medium">{{ record.fileName }}</div>
-            <div class="text-xs text-base-content/60">
-              {{ formatSize(record.fileSizeBytes) }} · {{ record.fileFormat.toUpperCase() }}
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-base-content/60">
+              <span>
+                {{ formatSize(record.fileSizeBytes) }} · {{ record.fileFormat.toUpperCase() }}
+              </span>
+              <span
+                class="badge badge-xs"
+                :class="{
+                  'badge-error': record.status === 'failed',
+                  'badge-success': record.status === 'ready',
+                  'badge-ghost': record.status === 'uploaded' || record.status === 'parsing'
+                }"
+              >
+                {{ record.status }}
+              </span>
             </div>
             <!-- Only a failed file carries one, and it is the whole reason the
-                 row is worth looking at. -->
-            <div v-if="record.errorMessage" class="text-xs text-error">
+                 row is worth looking at. `break-words` because the message comes
+                 from the API and can be longer than the column. -->
+            <div v-if="record.errorMessage" class="break-words text-xs text-error">
               {{ record.errorMessage }}
             </div>
           </div>
 
-          <span
-            class="badge badge-sm"
-            :class="{
-              'badge-error': record.status === 'failed',
-              'badge-success': record.status === 'ready',
-              'badge-ghost': record.status === 'uploaded' || record.status === 'parsing'
-            }"
-          >
-            {{ record.status }}
-          </span>
+          <div class="flex shrink-0 items-center">
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm btn-square"
+              :aria-label="`Analyze ${record.fileName}`"
+              @click="analyze(record)"
+            >
+              <ChartScatter :size="16" />
+            </button>
 
-          <!-- A real link, so the browser downloads it rather than the page
-               fetching the bytes only to hand them back. -->
-          <a
-            class="btn btn-ghost btn-sm btn-square"
-            :href="`/api/files/${record.id}/content`"
-            :download="record.fileName"
-            :aria-label="`Download ${record.fileName}`"
-          >
-            <Download :size="16" />
-          </a>
+            <!-- A real link, so the browser downloads it rather than the page
+                 fetching the bytes only to hand them back. -->
+            <a
+              class="btn btn-ghost btn-sm btn-square"
+              :href="`/api/files/${record.id}/content`"
+              :download="record.fileName"
+              :aria-label="`Download ${record.fileName}`"
+            >
+              <Download :size="16" />
+            </a>
 
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm btn-square"
-            :disabled="deleting"
-            :aria-label="`Delete ${record.fileName}`"
-            @click="removeOne(record)"
-          >
-            <Trash2 :size="16" />
-          </button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm btn-square"
+              :disabled="deleting"
+              :aria-label="`Delete ${record.fileName}`"
+              @click="removeOne(record)"
+            >
+              <Trash2 :size="16" />
+            </button>
+          </div>
         </li>
       </ul>
     </div>
 
+    <!-- The panel reports what it queued rather than showing it, so both it and
+         the upload card share the one toast. -->
+    <AnalysisDrawer ref="drawer" @queued="toast?.show($event)" />
     <AppToast ref="toast" />
   </div>
 </template>

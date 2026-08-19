@@ -58,8 +58,14 @@ const features = tableFeatures({
 const helper = createColumnHelper<typeof features, OrganizationSummary>()
 
 const columns = helper.columns([
-  helper.accessor('name', { header: 'Organization', meta: { tdClass: 'font-medium' } }),
-  helper.accessor('slug', { header: 'Slug', meta: { tdClass: 'font-mono' } }),
+  helper.accessor('name', { header: 'Organization' }),
+  // Below `md` this column is hidden and the slug rides along under the name
+  // instead — see the `#cell-name` slot. Hiding it in CSS rather than with
+  // `columnVisibilityFeature` keeps it sortable and needs no breakpoint state.
+  helper.accessor('slug', {
+    header: 'Slug',
+    meta: { thClass: 'hidden md:table-cell', tdClass: 'hidden font-mono md:table-cell' }
+  }),
   helper.accessor('clientCount', { header: 'Clients' }),
   // A display column: no accessor, so it is never sortable. `w-0` shrinks it to
   // the button, which is what keeps the name column wide.
@@ -214,18 +220,20 @@ async function onClientSaved(message: string) {
 
 <template>
   <div class="flex flex-col gap-6">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-semibold">Organizations</h1>        
-      </div>
-      <button class="btn btn-primary" @click="openDialog(null)">
+    <!-- Stacked by default; the action only moves up beside the heading once
+         there is room for it, so it is never a stranded half-width button. -->
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <h1 class="text-xl font-semibold sm:text-2xl">Organizations</h1>
+      <button class="btn btn-primary w-full sm:w-auto" @click="openDialog(null)">
         <Plus />
         Add organization
       </button>
     </div>
 
     <div class="card card-border bg-base-100">
-      <div class="card-body">
+      <!-- The default `card-body` padding costs 3rem of a 360px screen, which is
+           width the table needs more than the card needs breathing room. -->
+      <div class="card-body p-4 sm:p-6">
         <AppDataTable
           :table="table"
           :loading="status === 'pending'"
@@ -237,10 +245,25 @@ async function onClientSaved(message: string) {
             <span class="sr-only">Actions</span>
           </template>
 
+          <!-- The slug column is hidden below `md`, so the name cell carries it
+               there. Nothing is dropped on a phone, it just stacks. -->
+          <template #cell-name="{ row }">
+            <div class="font-medium">{{ row.name }}</div>
+            <div class="font-mono text-xs text-base-content/60 md:hidden">{{ row.slug }}</div>
+          </template>
+
+          <!-- The unit is dropped on narrow screens; the "Clients" header
+               already says what the number counts. -->
           <template #cell-clientCount="{ row }">
-            <button class="btn btn-ghost btn-sm" @click="openClients(row)">
+            <button
+              class="btn btn-ghost btn-sm whitespace-nowrap"
+              :aria-label="`View clients of ${row.name}`"
+              @click="openClients(row)"
+            >
               {{ row.clientCount }}
-              {{ row.clientCount === 1 ? 'client' : 'clients' }}
+              <span class="hidden sm:inline">
+                {{ row.clientCount === 1 ? 'client' : 'clients' }}
+              </span>
             </button>
           </template>
 
@@ -251,14 +274,20 @@ async function onClientSaved(message: string) {
               @click="openDialog(row)"
             >
               <Pencil />
-              Edit
+              <span class="hidden sm:inline">Edit</span>
             </button>
           </template>
         </AppDataTable>
       </div>
     </div>
 
-    <dialog ref="formDialog" class="modal" aria-labelledby="organization-dialog-title">
+    <!-- A sheet on phones, a centred box from `sm` up: a bottom sheet keeps the
+         fields clear of the on-screen keyboard and within thumb reach. -->
+    <dialog
+      ref="formDialog"
+      class="modal modal-bottom sm:modal-middle"
+      aria-labelledby="organization-dialog-title"
+    >
       <div class="modal-box">
         <h3 id="organization-dialog-title" class="text-lg font-bold">
           {{ isEditing ? 'Edit organization' : 'Add organization' }}
@@ -294,7 +323,10 @@ async function onClientSaved(message: string) {
             <span>{{ formError }}</span>
           </div>
 
-          <div class="modal-action">
+          <!-- Full-width and stacked on a phone, where "Cancel" beside a
+               sentence-long submit label would not fit. `-reverse` puts the
+               submit button on top, so DOM order still ends on the primary. -->
+          <div class="modal-action flex-col-reverse gap-2 sm:flex-row">
             <button type="button" class="btn btn-ghost" @click="formDialog?.close()">Cancel</button>
             <button type="submit" class="btn btn-primary" :disabled="submitting">
               <span v-if="submitting" class="loading loading-spinner loading-sm"></span>
@@ -308,13 +340,21 @@ async function onClientSaved(message: string) {
       </form>
     </dialog>
 
-    <dialog ref="clientsDialog" class="modal" aria-labelledby="clients-dialog-title">
+    <dialog
+      ref="clientsDialog"
+      class="modal modal-bottom sm:modal-middle"
+      aria-labelledby="clients-dialog-title"
+    >
       <div class="modal-box max-w-2xl">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h3 id="clients-dialog-title" class="text-lg font-bold">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h3 id="clients-dialog-title" class="min-w-0 break-words text-lg font-bold">
             Clients of {{ clientsOf?.name }}
           </h3>
-          <button type="button" class="btn btn-sm btn-primary" @click="openClientForm(null)">
+          <button
+            type="button"
+            class="btn btn-sm btn-primary w-full sm:w-auto"
+            @click="openClientForm(null)"
+          >
             <Plus />
             Add client
           </button>
@@ -330,27 +370,33 @@ async function onClientSaved(message: string) {
           No clients registered against this organization yet.
         </p>
         <ul v-else class="list">
-          <li v-for="client in clients" :key="client.id" class="list-row px-0">
-            <User class="text-base-content/40" />
+          <li v-for="client in clients" :key="client.id" class="list-row items-center px-0">
+            <User class="shrink-0 text-base-content/40" />
             <div class="min-w-0">
-              <div class="font-medium">{{ client.firstName }} {{ client.lastName }}</div>
-              <div class="text-xs text-base-content/60">{{ client.title }}</div>
+              <div class="truncate font-medium">{{ client.firstName }} {{ client.lastName }}</div>
+              <div class="truncate text-xs text-base-content/60">{{ client.title }}</div>
               <div class="truncate text-xs text-base-content/60">{{ client.email }}</div>
             </div>
             <button
               type="button"
-              class="btn btn-ghost btn-sm"
+              class="btn btn-ghost btn-sm shrink-0"
               :aria-label="`Edit ${client.firstName} ${client.lastName}`"
               @click="openClientForm(client)"
             >
               <Pencil />
-              Edit
+              <span class="hidden sm:inline">Edit</span>
             </button>
           </li>
         </ul>
 
         <div class="modal-action">
-          <button type="button" class="btn btn-ghost" @click="clientsDialog?.close()">Close</button>
+          <button
+            type="button"
+            class="btn btn-ghost w-full sm:w-auto"
+            @click="clientsDialog?.close()"
+          >
+            Close
+          </button>
         </div>
       </div>
       <form method="dialog" class="modal-backdrop">

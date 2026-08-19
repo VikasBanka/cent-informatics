@@ -110,7 +110,11 @@ watch(
 </script>
 
 <template>
-  <dialog ref="dialog" class="modal" aria-labelledby="client-dialog-title">
+  <dialog
+    ref="dialog"
+    class="modal modal-bottom sm:modal-middle"
+    aria-labelledby="client-dialog-title"
+  >
     <div class="modal-box max-w-2xl">
       <h3 id="client-dialog-title" class="text-lg font-bold">
         {{ isEditing ? 'Edit client' : 'Add client' }}
@@ -224,7 +228,8 @@ watch(
           <span>{{ formError }}</span>
         </div>
 
-        <div class="modal-action">
+        <!-- Stacked and full-width on a phone, side by side from `sm`. -->
+        <div class="modal-action flex-col-reverse gap-2 sm:flex-row">
           <button type="button" class="btn btn-ghost" @click="dialog?.close()">Cancel</button>
           <button type="submit" class="btn btn-primary" :disabled="submitting">
             <span v-if="submitting" class="loading loading-spinner loading-sm"></span>

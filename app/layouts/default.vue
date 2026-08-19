@@ -17,7 +17,14 @@ import { Menu } from '@lucide/vue'
         </label>
       </div>
 
-      <main class="w-full max-w-7xl grow p-4 sm:p-6">
+      <!-- `drawer` sizes its content column as `auto`, so this track is the whole
+           viewport minus the sidebar however wide that gets. `mx-auto` is what
+           keeps the capped column in the middle of it: without it the content
+           pins to the sidebar and every pixel past 80rem piles up as dead space
+           on the right, which is what an ultra-wide screen shows. The cap then
+           takes one step up at `2xl` so a 2560px display spends some of that
+           width on the content instead of on margins. -->
+      <main class="mx-auto w-full max-w-7xl grow p-4 sm:p-6 2xl:max-w-8xl 2xl:p-8">
         <slot />
       </main>
     </div>

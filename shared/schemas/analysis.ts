@@ -22,10 +22,10 @@ export const ANALYSIS_FILE_EXTENSIONS = ANALYSIS_FILE_FORMATS.map((format) => `.
 
 const MAX_KILOBYTES = 25
 
-export const ANALYSIS_FILE_MAX_BYTES = MAX_KILOBYTES * 1024 * 1024
+export const ANALYSIS_FILE_MAX_BYTES = MAX_KILOBYTES * 1024
 
 /** The size limit as UI copy, so a message and the check cannot drift apart. */
-export const ANALYSIS_FILE_MAX_LABEL = `${MAX_KILOBYTES} MB`
+export const ANALYSIS_FILE_MAX_LABEL = `${MAX_KILOBYTES} KB`
 
 /** How many files may be uploaded in one batch. */
 export const ANALYSIS_FILE_MAX_COUNT = 10
@@ -112,6 +112,43 @@ export const FileDeleteSchema = z.object({
   ids: z.array(z.uuid()).check(z.minLength(1, { error: 'Choose at least one file to delete' }))
 })
 
+/**
+ * The statistics the analysis panel can ask for — one button apiece in
+ * `AnalysisDrawer`, and the `analysisType` the queued message carries. Adding a
+ * statistic is this one edit: the panel renders the list, and the route and the
+ * message both validate against it.
+ *
+ * The members double as their own button labels, capitalised in CSS, so there is
+ * no second list of display names to keep in step.
+ */
+export const ANALYSIS_TYPES = ['summary', 'mean', 'median', 'mode', 'variance'] as const
+
+export const AnalysisTypeSchema = z.enum(ANALYSIS_TYPES)
+
+/**
+ * What the panel posts to ask for one statistic. The file is named in the path,
+ * so only the type travels in the body.
+ */
+export const AnalysisRequestSchema = z.object({
+  analysisType: AnalysisTypeSchema
+})
+
+/**
+ * The message published to the analysis queue.
+ *
+ * Its own schema rather than the request's: a queue is a boundary like any
+ * other, and what a consumer reads is this shape — not whichever HTTP body
+ * happened to trigger it. `requestedAt` is stamped by the publisher, so a
+ * message that sat in the queue still says when it was asked for.
+ */
+export const AnalysisEventSchema = z.object({
+  fileId: z.uuid(),
+  analysisType: AnalysisTypeSchema,
+  requestedAt: z.iso.datetime()
+})
+
 export type AnalysisFile = z.infer<typeof AnalysisFileSchema>
 export type AnalysisFileList = z.infer<typeof AnalysisFileListSchema>
 export type FileRecord = z.infer<typeof FileRecordSchema>
+export type AnalysisType = z.infer<typeof AnalysisTypeSchema>
+export type AnalysisEvent = z.infer<typeof AnalysisEventSchema>
